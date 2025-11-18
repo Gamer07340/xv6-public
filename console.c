@@ -143,6 +143,8 @@ cgaputc(int c)
     pos += 80 - pos%80;
   else if(c == BACKSPACE){
     if(pos > 0) --pos;
+  } else if(c == '\t'){
+    pos += 8 - (pos % 8);
   } else
     crt[pos++] = (c&0xff) | 0x0700;  // black on white
 

@@ -89,3 +89,16 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_crash(void)
+{
+  panic("user requested crash");
+  return 0;
+}
+
+int
+sys_ps(void)
+{
+  return cps();
+}

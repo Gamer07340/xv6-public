@@ -496,6 +496,15 @@ kill(int pid)
   return -1;
 }
 
+static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+};
+
 //PAGEBREAK: 36
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
@@ -503,14 +512,6 @@ kill(int pid)
 void
 procdump(void)
 {
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [EMBRYO]    "embryo",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
   int i;
   struct proc *p;
   char *state;
@@ -531,4 +532,24 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+cps(void)
+{
+  struct proc *p;
+  // Enable interrupts on this processor.
+  sti();
+
+  // Loop over process table looking for process to run.
+  acquire(&ptable.lock);
+  cprintf("name \t pid \t state \t \n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      cprintf("%s \t %d \t %s \t \n", p->name, p->pid, states[p->state]);
+  }
+  release(&ptable.lock);
+  return 22;
 }
