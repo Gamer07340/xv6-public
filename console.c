@@ -127,6 +127,10 @@ panic(char *s)
 #define BACKSPACE 0x100
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
+static int ansi_state = 0;
+static int ansi_val[2];
+static int ansi_idx = 0;
+static int ansi_attr = 0x0700; // black on white
 
 static void
 cgaputc(int c)
@@ -139,17 +143,78 @@ cgaputc(int c)
   outb(CRTPORT, 15);
   pos |= inb(CRTPORT+1);
 
-  if(c == '\n')
-    pos += 80 - pos%80;
-  else if(c == BACKSPACE){
-    if(pos > 0) --pos;
-  } else if(c == '\t'){
-    pos += 8 - (pos % 8);
-  } else
-    crt[pos++] = (c&0xff) | 0x0700;  // black on white
+  if(ansi_state == 0){
+    if(c == '\x1b'){
+      ansi_state = 1;
+    } else if(c == '\n'){
+      pos += 80 - pos%80;
+    } else if(c == BACKSPACE){
+      if(pos > 0) --pos;
+    } else if(c == '\t'){
+      pos += 8 - (pos % 8);
+    } else {
+      crt[pos++] = (c&0xff) | ansi_attr;
+    }
+  } else if(ansi_state == 1){
+    if(c == '['){
+      ansi_state = 2;
+      ansi_val[0] = -1;
+      ansi_val[1] = -1;
+      ansi_idx = 0;
+    } else {
+      ansi_state = 0;
+      // Emit the swallowed ESC? Too complex for now, just ignore invalid sequences
+    }
+  } else if(ansi_state == 2){
+    if(c >= '0' && c <= '9'){
+      if(ansi_val[ansi_idx] == -1) ansi_val[ansi_idx] = 0;
+      ansi_val[ansi_idx] = ansi_val[ansi_idx] * 10 + (c - '0');
+    } else if(c == ';'){
+      if(ansi_idx < 1) ansi_idx++;
+    } else {
+      int v = ansi_val[0] == -1 ? 1 : ansi_val[0];
+      switch(c){
+      case 'A': pos -= 80 * v; break; // Up
+      case 'B': pos += 80 * v; break; // Down
+      case 'C': pos += v; break;      // Right
+      case 'D': pos -= v; break;      // Left
+      case 'H': // Cursor Position
+        {
+          int r = ansi_val[0] == -1 ? 0 : ansi_val[0]-1;
+          int c = ansi_val[1] == -1 ? 0 : ansi_val[1]-1;
+          if(r<0) r=0;
+          if(r>24) r=24;
+          if(c<0) c=0;
+          if(c>79) c=79;
+          pos = r * 80 + c;
+        }
+        break;
+      case 'J': // Clear screen
+        if(v == 2){
+           int i;
+           for(i = 0; i < 25*80; i++) crt[i] = ' ' | ansi_attr;
+           pos = 0;
+        }
+        break;
+      case 'm': // SGR - Select Graphic Rendition
+        {
+          int i;
+          for(i=0; i<=ansi_idx; i++){
+             int val = ansi_val[i];
+             if(val == -1) val = 0;
+             if(val == 0) ansi_attr = 0x0700; // Reset
+             else if(val >= 30 && val <= 37) ansi_attr = (ansi_attr & 0xF000) | ((val-30)<<8); // FG
+             else if(val >= 40 && val <= 47) ansi_attr = (ansi_attr & 0x0F00) | ((val-40)<<12); // BG
+          }
+        }
+        break;
+      }
+      ansi_state = 0;
+    }
+  }
 
   if(pos < 0 || pos > 25*80)
-    panic("pos under/overflow");
+    pos %= 25*80; // Wrap around safely instead of panic
 
   if((pos/80) >= 24){  // Scroll up.
     memmove(crt, crt+80, sizeof(crt[0])*23*80);
@@ -161,7 +226,7 @@ cgaputc(int c)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | 0x0700;
+  crt[pos] = ' ' | ansi_attr;
 }
 
 void

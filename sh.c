@@ -123,8 +123,47 @@ runcmd(struct cmd *cmd)
 
   case BACK:
     bcmd = (struct backcmd*)cmd;
-    if(fork1() == 0)
+    if(fork1() == 0){
+      char logpath[32];
+      // We don't have sprintf, so we construct the string manually or use a simple helper if available.
+      // Since we are in the shell (user space), we can't use kernel cprintf.
+      // We'll rely on the fact that we can just open the file.
+      // But wait, we need the PID of the *child* to name the file.
+      // The child knows its own PID via getpid().
+      
+      int pid = getpid();
+      // Construct "/log/PID"
+      // Simple integer to string conversion
+      char pid_str[16];
+      int i = 0;
+      int n = pid;
+      if(n == 0) pid_str[i++] = '0';
+      else {
+        while(n > 0){
+          pid_str[i++] = (n % 10) + '0';
+          n /= 10;
+        }
+      }
+      pid_str[i] = 0;
+      // Reverse the string
+      int start = 0, end = i - 1;
+      while(start < end){
+        char temp = pid_str[start];
+        pid_str[start] = pid_str[end];
+        pid_str[end] = temp;
+        start++; end--;
+      }
+
+      strcpy(logpath, "/log/");
+      strcpy(logpath + 5, pid_str);
+
+      close(1);
+      if(open(logpath, O_CREATE|O_WRONLY) < 0){
+        printf(2, "failed to open log file %s\n", logpath);
+        exit();
+      }
       runcmd(bcmd->cmd);
+    }
     break;
   }
   exit();

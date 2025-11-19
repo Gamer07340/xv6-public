@@ -183,6 +183,9 @@ UPROGS=\
 	_zombie\
 	_crash\
 	_ps\
+	_cp\
+	_mv\
+	_ansi_demo\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

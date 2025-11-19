@@ -22,9 +22,23 @@ exec(char *path, char **argv)
   begin_op();
 
   if((ip = namei(path)) == 0){
-    end_op();
-    cprintf("exec: fail\n");
-    return -1;
+    char binpath[128];
+    int has_slash = 0;
+    for(s = path; *s; s++)
+      if(*s == '/')
+        has_slash = 1;
+    
+    if(!has_slash && strlen(path) + 5 < sizeof(binpath)){
+      memmove(binpath, "/bin/", 5);
+      memmove(binpath+5, path, strlen(path)+1);
+      ip = namei(binpath);
+    }
+    
+    if(ip == 0){
+      end_op();
+      cprintf("exec: fail\n");
+      return -1;
+    }
   }
   ilock(ip);
   pgdir = 0;
