@@ -25,6 +25,7 @@ int sleep(int);
 int uptime(void);
 int crash(void);
 int ps(void);
+int setconsolemode(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -21,8 +21,17 @@ static int panicked = 0;
 
 static struct {
   struct spinlock lock;
-  int locking;
+    int locking;
+    int rawmode;
 } cons;
+
+void
+console_setmode(int mode)
+{
+  acquire(&cons.lock);
+  cons.rawmode = mode;
+  release(&cons.lock);
+}
 
 static void
 printint(int xx, int base, int sign)
@@ -262,6 +271,15 @@ consoleintr(int (*getc)(void))
 
   acquire(&cons.lock);
   while((c = getc()) >= 0){
+    if(cons.rawmode){
+      if(input.e-input.r < INPUT_BUF){
+        input.buf[input.e++ % INPUT_BUF] = c;
+        input.w = input.e;
+        wakeup(&input.r);
+      }
+      continue;
+    }
+
     switch(c){
     case C('P'):  // Process listing.
       // procdump() locks cons.lock indirectly; invoke later

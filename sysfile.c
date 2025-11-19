@@ -442,3 +442,15 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+int
+sys_setconsolemode(void)
+{
+  int mode;
+
+  if(argint(0, &mode) < 0)
+    return -1;
+  
+  console_setmode(mode);
+  return 0;
+}

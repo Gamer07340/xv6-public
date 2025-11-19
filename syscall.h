@@ -22,3 +22,4 @@
 #define SYS_close  21
 #define SYS_crash  22
 #define SYS_ps     23
+#define SYS_setconsolemode 24
