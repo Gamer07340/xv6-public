@@ -181,12 +181,14 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_bigfile\
 	_crash\
 	_ps\
 	_cp\
 	_mv\
 	_ansi_demo\
 	_nano\
+	_more\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

@@ -158,6 +158,11 @@ cgaputc(int c)
     } else if(c == '\n'){
       pos += 80 - pos%80;
     } else if(c == BACKSPACE){
+      if(pos > 0){
+        --pos;
+        crt[pos] = ' ' | ansi_attr;
+      }
+    } else if(c == '\b'){
       if(pos > 0) --pos;
     } else if(c == '\t'){
       pos += 8 - (pos % 8);
@@ -225,17 +230,19 @@ cgaputc(int c)
   if(pos < 0 || pos > 25*80)
     pos %= 25*80; // Wrap around safely instead of panic
 
-  if((pos/80) >= 24){  // Scroll up.
-    memmove(crt, crt+80, sizeof(crt[0])*23*80);
+  if(pos >= 25*80){  // Scroll up.
+    memmove(crt, crt+80, sizeof(crt[0])*24*80);
     pos -= 80;
-    memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
+    memset(crt+pos, 0, sizeof(crt[0])*80);
   }
 
   outb(CRTPORT, 14);
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | ansi_attr;
+  
+  if((crt[pos] & 0xff) == 0)
+    crt[pos] = ' ' | ansi_attr;
 }
 
 void

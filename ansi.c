@@ -35,3 +35,9 @@ putstr(char *s)
 {
   printf(1, "%s", s);
 }
+
+void
+reset(void)
+{
+  printf(1, "\x1b[2J");
+}

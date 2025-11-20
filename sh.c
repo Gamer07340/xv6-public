@@ -169,14 +169,252 @@ runcmd(struct cmd *cmd)
   exit();
 }
 
+#include "fs.h"
+
+#define KEY_UP 0xE2
+#define KEY_DOWN 0xE3
+#define KEY_LEFT 0xE4
+#define KEY_RIGHT 0xE5
+#define BACKSPACE 127
+#define CTRL_D 4
+#define TAB 9
+
+#define MAX_HISTORY 10
+char history[MAX_HISTORY][100];
+int history_count = 0;
+
+void
+history_add(char *cmd)
+{
+  if(cmd[0] == 0) return;
+  // Simple append, no rotation for now (or rotate if full)
+  if(history_count < MAX_HISTORY){
+    strcpy(history[history_count], cmd);
+    history_count++;
+  } else {
+    // Rotate
+    int i;
+    for(i = 0; i < MAX_HISTORY - 1; i++){
+      strcpy(history[i], history[i+1]);
+    }
+    strcpy(history[MAX_HISTORY-1], cmd);
+  }
+}
+
+void
+autocomplete(char *buf, int *pos, int *len)
+{
+  // 1. Find start of current word
+  int word_start = *pos;
+  while(word_start > 0 && buf[word_start-1] != ' '){
+    word_start--;
+  }
+  
+  // 2. Determine if it's the first word
+  int is_first_word = 1;
+  int i;
+  for(i = 0; i < word_start; i++){
+    if(buf[i] != ' '){
+      is_first_word = 0;
+      break;
+    }
+  }
+  
+  // 3. Get prefix
+  char prefix[100];
+  int prefix_len = *pos - word_start;
+  if(prefix_len == 0) return; // Nothing to complete
+  memmove(prefix, buf + word_start, prefix_len);
+  prefix[prefix_len] = 0;
+  
+  // 4. Open directory
+  int fd;
+  if(is_first_word){
+    fd = open("/bin", 0); // O_RDONLY
+    if(fd < 0) fd = open(".", 0); // Fallback
+  } else {
+    fd = open(".", 0);
+  }
+  if(fd < 0) return;
+  
+  // 5. Search
+  struct dirent de;
+  while(read(fd, &de, sizeof(de)) == sizeof(de)){
+    if(de.inum == 0) continue;
+    
+    char name[DIRSIZ+1];
+    memmove(name, de.name, DIRSIZ);
+    name[DIRSIZ] = 0;
+    
+    // Check prefix match
+    int match = 1;
+    for(i = 0; i < prefix_len; i++){
+      if(name[i] != prefix[i]){
+        match = 0;
+        break;
+      }
+    }
+    
+    if(match){
+      // Found a match!
+      char *suffix = name + prefix_len;
+      int suffix_len = strlen(suffix);
+      
+      if(suffix_len > 0 && *len + suffix_len < 100 - 1){
+        // Shift right
+        for(i = *len; i >= *pos; i--){
+           buf[i + suffix_len] = buf[i];
+        }
+        
+        // Copy suffix
+        memmove(buf + *pos, suffix, suffix_len);
+        
+        // Update len and pos
+        *len += suffix_len;
+        *pos += suffix_len;
+        
+        // Print suffix
+        for(i = 0; i < suffix_len; i++) printf(1, "%c", suffix[i]);
+        
+        // Print rest of line
+        int rest_len = *len - *pos;
+        for(i = 0; i < rest_len; i++) printf(1, "%c", buf[*pos + i]);
+        
+        // Move cursor back
+        for(i = 0; i < rest_len; i++) printf(1, "\b");
+      }
+      break; // Stop after first match
+    }
+  }
+  
+  close(fd);
+}
+
 int
 getcmd(char *buf, int nbuf)
 {
   printf(2, "$ ");
   memset(buf, 0, nbuf);
-  gets(buf, nbuf);
-  if(buf[0] == 0) // EOF
-    return -1;
+  
+  setconsolemode(1);
+  
+  int pos = 0;
+  int len = 0;
+  int hist_pos = history_count;
+  uchar c;
+  int i;
+  
+  while(1){
+    if(read(0, &c, 1) != 1) break;
+    
+    if(c == 0) continue;
+    
+    if(c == KEY_UP){
+      if(hist_pos > 0){
+        // Erase current line
+        while(pos > 0){
+          printf(1, "\b");
+          pos--;
+        }
+        for(i = 0; i < len; i++) printf(1, " ");
+        for(i = 0; i < len; i++) printf(1, "\b");
+        
+        hist_pos--;
+        strcpy(buf, history[hist_pos]);
+        len = strlen(buf);
+        pos = len;
+        printf(1, "%s", buf);
+      }
+    } else if(c == KEY_DOWN){
+      if(hist_pos < history_count){
+        // Erase current line
+        while(pos > 0){
+          printf(1, "\b");
+          pos--;
+        }
+        for(i = 0; i < len; i++) printf(1, " ");
+        for(i = 0; i < len; i++) printf(1, "\b");
+        
+        hist_pos++;
+        if(hist_pos == history_count){
+          buf[0] = 0;
+          len = 0;
+          pos = 0;
+        } else {
+          strcpy(buf, history[hist_pos]);
+          len = strlen(buf);
+          pos = len;
+          printf(1, "%s", buf);
+        }
+      }
+    } else if(c == KEY_LEFT){
+      if(pos > 0){
+        printf(1, "\b");
+        pos--;
+      }
+    } else if(c == KEY_RIGHT){
+      if(pos < len){
+        printf(1, "%c", buf[pos]);
+        pos++;
+      }
+    } else if(c == BACKSPACE || c == '\b'){
+      if(pos > 0){
+        // Shift left
+        for(i = pos; i < len; i++){
+          buf[i-1] = buf[i];
+        }
+        len--;
+        pos--;
+        buf[len] = 0;
+        
+        // Update screen
+        printf(1, "\b"); // Move back
+        for(i = pos; i < len; i++){
+          printf(1, "%c", buf[i]);
+        }
+        printf(1, " "); // Erase last char
+        // Move cursor back to pos
+        for(i = pos; i <= len; i++){ // +1 for the space we just printed
+          printf(1, "\b");
+        }
+      }
+    } else if(c == TAB){
+      autocomplete(buf, &pos, &len);
+    } else if(c == '\r' || c == '\n'){
+      printf(1, "\n");
+      buf[len] = 0;
+      history_add(buf);
+      break;
+    } else if(c == CTRL_D){
+      if(len == 0){
+        setconsolemode(0);
+        return -1;
+      }
+    } else if(c >= 32 && c <= 126){
+      if(len < nbuf - 1){
+        // Shift right
+        for(i = len; i > pos; i--){
+          buf[i] = buf[i-1];
+        }
+        buf[pos] = c;
+        len++;
+        pos++;
+        buf[len] = 0;
+        
+        // Update screen
+        printf(1, "%c", c);
+        for(i = pos; i < len; i++){
+          printf(1, "%c", buf[i]);
+        }
+        // Move cursor back
+        for(i = pos; i < len; i++){
+          printf(1, "\b");
+        }
+      }
+    }
+  }
+  
+  setconsolemode(0);
   return 0;
 }
 

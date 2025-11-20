@@ -16,5 +16,5 @@ void cursor(int x, int y);
 void color(int fg, int bg);
 void setchar(int x, int y, char c);
 void putstr(char *s);
-
+void reset(void);
 #endif // ANSI_H

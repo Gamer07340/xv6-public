@@ -6,8 +6,7 @@ int
 main(int argc, char *argv[])
 {
   // Clear screen (manually for now as not in lib, or use cursor/putstr)
-  printf(1, "\x1b[2J"); // Keeping raw clear screen as it wasn't requested in lib
-
+  reset();
   // Move cursor to 5,5
   cursor(5, 5);
   

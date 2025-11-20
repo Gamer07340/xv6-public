@@ -3,13 +3,15 @@
 #include "ansi.h"
 #include "fcntl.h"
 
-#define MAX_BUF 1024
+#define MAX_BUF 4096
 #define WIDTH 80
 #define HEIGHT 24
 
 char buffer[MAX_BUF];
 int buf_len = 0;
 int cursor_pos = 0; // Position in buffer
+int off_x = 0;
+int off_y = 0;
 char *filename = 0;
 char status_msg[80] = "";
 
@@ -21,7 +23,7 @@ draw_status_bar()
   
   // Clear line first
   int i;
-  for(i=0; i<WIDTH; i++) putstr(" ");
+  for(i=0; i<WIDTH-1; i++) putstr(" ");
   
   cursor(0, HEIGHT);
   if(status_msg[0] != 0){
@@ -38,18 +40,11 @@ draw_status_bar()
 void
 draw_buffer()
 {
-  // Clear screen area (rows 0 to HEIGHT-1)
-  printf(1, "\x1b[2J");
-  
-  draw_status_bar();
-
-  cursor(0, 0);
-  color(ANSI_WHITE, ANSI_BLACK);
-  
   int i;
   int x = 0, y = 0;
   int cursor_x = 0, cursor_y = 0;
-  
+
+  // Pass 1: Calculate cursor position and content dimensions
   for(i=0; i<buf_len; i++){
     if(i == cursor_pos){
       cursor_x = x;
@@ -60,22 +55,51 @@ draw_buffer()
       x = 0;
       y++;
     } else {
-      setchar(x, y, buffer[i]);
       x++;
-      if(x >= WIDTH){
-        x = 0;
-        y++;
-      }
     }
   }
   
-  // If cursor is at end of buffer
+  // Handle cursor at very end of buffer
   if(cursor_pos == buf_len){
     cursor_x = x;
     cursor_y = y;
   }
+
+  // Adjust Scroll (Viewport)
+  // Vertical scroll
+  if(cursor_y < off_y) off_y = cursor_y;
+  if(cursor_y >= off_y + (HEIGHT - 1)) off_y = cursor_y - (HEIGHT - 2);
   
-  cursor(cursor_x, cursor_y);
+  // Horizontal scroll
+  if(cursor_x < off_x) off_x = cursor_x;
+  if(cursor_x >= off_x + WIDTH) off_x = cursor_x - (WIDTH - 1);
+
+  // Clear screen area (rows 0 to HEIGHT-1)
+  printf(1, "\x1b[2J");
+  
+  draw_status_bar();
+
+  cursor(0, 0);
+  color(ANSI_WHITE, ANSI_BLACK);
+  
+  // Pass 2: Draw visible portion
+  x = 0; y = 0;
+  for(i=0; i<buf_len; i++){
+    if(buffer[i] == '\n'){
+      x = 0;
+      y++;
+    } else {
+      // Only draw if within visible viewport
+      if(y >= off_y && y < off_y + (HEIGHT - 1) &&
+         x >= off_x && x < off_x + WIDTH){
+        setchar(x - off_x, y - off_y, buffer[i]);
+      }
+      x++;
+    }
+  }
+  
+  // Set actual cursor position on screen
+  cursor(cursor_x - off_x, cursor_y - off_y);
 }
 
 void

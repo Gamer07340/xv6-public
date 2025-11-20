@@ -326,7 +326,7 @@ iappend(uint inum, void *xp, int n)
         din.addrs[fbn] = xint(freeblock++);
       }
       x = xint(din.addrs[fbn]);
-    } else {
+    } else if(fbn < NDIRECT + NINDIRECT){
       if(xint(din.addrs[NDIRECT]) == 0){
         din.addrs[NDIRECT] = xint(freeblock++);
       }
@@ -336,6 +336,22 @@ iappend(uint inum, void *xp, int n)
         wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
       }
       x = xint(indirect[fbn-NDIRECT]);
+    } else {
+      if(xint(din.addrs[NDIRECT+1]) == 0){
+        din.addrs[NDIRECT+1] = xint(freeblock++);
+      }
+      rsect(xint(din.addrs[NDIRECT+1]), (char*)indirect);
+      if(indirect[(fbn - NDIRECT - NINDIRECT) / NINDIRECT] == 0){
+        indirect[(fbn - NDIRECT - NINDIRECT) / NINDIRECT] = xint(freeblock++);
+        wsect(xint(din.addrs[NDIRECT+1]), (char*)indirect);
+      }
+      x = xint(indirect[(fbn - NDIRECT - NINDIRECT) / NINDIRECT]);
+      rsect(x, (char*)indirect);
+      if(indirect[(fbn - NDIRECT - NINDIRECT) % NINDIRECT] == 0){
+        indirect[(fbn - NDIRECT - NINDIRECT) % NINDIRECT] = xint(freeblock++);
+        wsect(x, (char*)indirect);
+      }
+      x = xint(indirect[(fbn - NDIRECT - NINDIRECT) % NINDIRECT]);
     }
     n1 = min(n, (fbn + 1) * BSIZE - off);
     rsect(x, buf);
