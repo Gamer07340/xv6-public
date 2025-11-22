@@ -141,7 +141,13 @@ idestart(struct buf *b)
   if(b->blockno >= FSSIZE && !(b->flags & B_RAW))
     panic("incorrect blockno");
   int sector_per_block =  BSIZE/SECTOR_SIZE;
-  int sector = b->blockno * sector_per_block;
+  int blockno = b->blockno;
+  
+  // Add filesystem offset for disk 0 (unless raw disk access)
+  if(b->dev == 0 && !(b->flags & B_RAW))
+    blockno += FSOFFSET;
+  
+  int sector = blockno * sector_per_block;
   int read_cmd = (sector_per_block == 1) ? IDE_CMD_READ :  IDE_CMD_RDMUL;
   int write_cmd = (sector_per_block == 1) ? IDE_CMD_WRITE : IDE_CMD_WRMUL;
 

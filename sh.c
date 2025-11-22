@@ -76,6 +76,32 @@ runcmd(struct cmd *cmd)
     if(ecmd->argv[0] == 0)
       exit();
     exec(ecmd->argv[0], ecmd->argv);
+    
+    // If exec failed, it might be a shell script.
+    // Try to run it with sh.
+    // We need to construct a new argv: sh script_name args...
+    {
+      char *new_argv[MAXARGS];
+      int i;
+      
+      // Check if we have enough space in new_argv
+      // We need 1 slot for "sh", then existing args.
+      // ecmd->argv is null terminated.
+      // Count args.
+      int argc = 0;
+      while(ecmd->argv[argc] && argc < MAXARGS) argc++;
+      
+      if(argc + 1 < MAXARGS){
+        new_argv[0] = "sh";
+        for(i = 0; i < argc; i++){
+          new_argv[i+1] = ecmd->argv[i];
+        }
+        new_argv[argc+1] = 0;
+        
+        exec("sh", new_argv);
+      }
+    }
+    
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -290,13 +316,16 @@ autocomplete(char *buf, int *pos, int *len)
   close(fd);
 }
 
+
 int
-getcmd(char *buf, int nbuf)
+getcmd(char *buf, int nbuf, int prompt)
 {
-  printf(2, "$ ");
+  if(prompt)
+    printf(2, "$ ");
   memset(buf, 0, nbuf);
   
-  setconsolemode(1);
+  if(prompt)
+    setconsolemode(1);
   
   int pos = 0;
   int len = 0;
@@ -305,7 +334,10 @@ getcmd(char *buf, int nbuf)
   int i;
   
   while(1){
-    if(read(0, &c, 1) != 1) break;
+    if(read(0, &c, 1) != 1){
+      if(len == 0) return -1;
+      break;
+    }
     
     if(c == 0) continue;
     
@@ -414,15 +446,17 @@ getcmd(char *buf, int nbuf)
     }
   }
   
-  setconsolemode(0);
+  if(prompt)
+    setconsolemode(0);
   return 0;
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
   static char buf[100];
   int fd;
+  int prompt = 1;
 
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
@@ -433,7 +467,16 @@ main(void)
   }
 
   // Read and run input commands.
-  while(getcmd(buf, sizeof(buf)) >= 0){
+  if(argc > 1){
+    close(0);
+    if(open(argv[1], O_RDONLY) < 0){
+      printf(2, "cannot open %s\n", argv[1]);
+      exit();
+    }
+    prompt = 0;
+  }
+
+  while(getcmd(buf, sizeof(buf), prompt) >= 0){
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       if(chdir(buf+3) < 0)
