@@ -23,3 +23,6 @@
 #define SYS_crash  22
 #define SYS_ps     23
 #define SYS_setconsolemode 24
+#define SYS_mount  25
+#define SYS_umount 26
+#define SYS_lseek  27

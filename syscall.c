@@ -106,6 +106,9 @@ extern int sys_uptime(void);
 extern int sys_crash(void);
 extern int sys_ps(void);
 extern int sys_setconsolemode(void);
+extern int sys_mount(void);
+extern int sys_umount(void);
+extern int sys_lseek(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -132,6 +135,9 @@ static int (*syscalls[])(void) = {
 [SYS_crash]   sys_crash,
 [SYS_ps]      sys_ps,
 [SYS_setconsolemode] sys_setconsolemode,
+[SYS_mount]   sys_mount,
+[SYS_umount]  sys_umount,
+[SYS_lseek]   sys_lseek,
 };
 
 void

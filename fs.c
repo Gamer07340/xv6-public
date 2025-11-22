@@ -27,6 +27,37 @@ static void itrunc(struct inode*);
 // only one device
 struct superblock sb; 
 
+struct mount {
+  int active;
+  int dev;
+  struct superblock sb;
+  struct inode *ip;
+} mounts[NMOUNT];
+
+struct spinlock mount_lock;
+
+void
+mountinit(void)
+{
+  initlock(&mount_lock, "mount_lock");
+}
+
+static struct superblock*
+getsb(uint dev)
+{
+  struct mount *m;
+  if(dev == ROOTDEV) return &sb;
+  acquire(&mount_lock);
+  for(m = mounts; m < mounts + NMOUNT; m++){
+    if(m->active && m->dev == dev){
+      release(&mount_lock);
+      return &m->sb;
+    }
+  }
+  release(&mount_lock);
+  panic("getsb: unknown device");
+} 
+
 // Read the super block.
 void
 readsb(int dev, struct superblock *sb)
@@ -60,9 +91,11 @@ balloc(uint dev)
   struct buf *bp;
 
   bp = 0;
-  for(b = 0; b < sb.size; b += BPB){
-    bp = bread(dev, BBLOCK(b, sb));
-    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
+  struct superblock *s = getsb(dev);
+  bp = 0;
+  for(b = 0; b < s->size; b += BPB){
+    bp = bread(dev, BBLOCK(b, (*s)));
+    for(bi = 0; bi < BPB && b + bi < s->size; bi++){
       m = 1 << (bi % 8);
       if((bp->data[bi/8] & m) == 0){  // Is block free?
         bp->data[bi/8] |= m;  // Mark block in use.
@@ -84,7 +117,8 @@ bfree(int dev, uint b)
   struct buf *bp;
   int bi, m;
 
-  bp = bread(dev, BBLOCK(b, sb));
+  struct superblock *s = getsb(dev);
+  bp = bread(dev, BBLOCK(b, (*s)));
   bi = b % BPB;
   m = 1 << (bi % 8);
   if((bp->data[bi/8] & m) == 0)
@@ -177,6 +211,7 @@ iinit(int dev)
   for(i = 0; i < NINODE; i++) {
     initsleeplock(&icache.inode[i].lock, "inode");
   }
+  mountinit();
 
   readsb(dev, &sb);
   cprintf("sb: size %d nblocks %d ninodes %d nlog %d logstart %d\
@@ -198,8 +233,9 @@ ialloc(uint dev, short type)
   struct buf *bp;
   struct dinode *dip;
 
-  for(inum = 1; inum < sb.ninodes; inum++){
-    bp = bread(dev, IBLOCK(inum, sb));
+  struct superblock *s = getsb(dev);
+  for(inum = 1; inum < s->ninodes; inum++){
+    bp = bread(dev, IBLOCK(inum, (*s)));
     dip = (struct dinode*)bp->data + inum%IPB;
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
@@ -223,7 +259,8 @@ iupdate(struct inode *ip)
   struct buf *bp;
   struct dinode *dip;
 
-  bp = bread(ip->dev, IBLOCK(ip->inum, sb));
+  struct superblock *s = getsb(ip->dev);
+  bp = bread(ip->dev, IBLOCK(ip->inum, (*s)));
   dip = (struct dinode*)bp->data + ip->inum%IPB;
   dip->type = ip->type;
   dip->major = ip->major;
@@ -296,7 +333,8 @@ ilock(struct inode *ip)
   acquiresleep(&ip->lock);
 
   if(ip->valid == 0){
-    bp = bread(ip->dev, IBLOCK(ip->inum, sb));
+    struct superblock *s = getsb(ip->dev);
+    bp = bread(ip->dev, IBLOCK(ip->inum, (*s)));
     dip = (struct dinode*)bp->data + ip->inum%IPB;
     ip->type = dip->type;
     ip->major = dip->major;
@@ -502,7 +540,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read)
       return -1;
-    return devsw[ip->major].read(ip, dst, n);
+    return devsw[ip->major].read(ip, dst, n, off);
   }
 
   if(off > ip->size || off + n < off)
@@ -531,7 +569,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
       return -1;
-    return devsw[ip->major].write(ip, src, n);
+    return devsw[ip->major].write(ip, src, n, off);
   }
 
   if(off > ip->size || off + n < off)
@@ -661,6 +699,59 @@ skipelem(char *path, char *name)
   return path;
 }
 
+int
+mount(struct inode *ip, int dev)
+{
+  struct mount *m;
+  struct inode *dup_ip;
+  struct superblock sb_temp;
+
+  // Duplicate the inode first, before acquiring mount_lock
+  dup_ip = idup(ip);
+  
+  // Read the superblock before acquiring the lock (bread can sleep)
+  readsb(dev, &sb_temp);
+
+  acquire(&mount_lock);
+  for(m = mounts; m < mounts + NMOUNT; m++){
+    if(!m->active){
+      m->active = 1;
+      m->dev = dev;
+      m->ip = dup_ip;
+      m->sb = sb_temp;
+      release(&mount_lock);
+      return 0;
+    }
+  }
+  release(&mount_lock);
+  
+  // Failed to find a free mount slot, release the duplicated inode
+  iput(dup_ip);
+  return -1;
+}
+
+int
+umount(struct inode *ip)
+{
+  struct mount *m;
+  struct inode *mount_ip = 0;
+
+  acquire(&mount_lock);
+  for(m = mounts; m < mounts + NMOUNT; m++){
+    if(m->active && m->ip->dev == ip->dev && m->ip->inum == ip->inum){
+       m->active = 0;
+       mount_ip = m->ip;
+       m->ip = 0;
+       release(&mount_lock);
+       // Release the inode after releasing the lock
+       iput(mount_ip);
+       return 0;
+    }
+  }
+  release(&mount_lock);
+  return -1;
+}
+
 // Look up and return the inode for a path name.
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
@@ -669,6 +760,7 @@ static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
   struct inode *ip, *next;
+  struct mount *m;
 
   if(*path == '/')
     ip = iget(ROOTDEV, ROOTINO);
@@ -686,12 +778,42 @@ namex(char *path, int nameiparent, char *name)
       iunlock(ip);
       return ip;
     }
+    if(namecmp(name, "..") == 0 && ip->inum == ROOTINO && ip->dev != ROOTDEV){
+       acquire(&mount_lock);
+       for(m = mounts; m < mounts + NMOUNT; m++){
+         if(m->active && m->dev == ip->dev){
+            struct inode *next_ip = idup(m->ip);
+            release(&mount_lock);
+            iunlockput(ip);
+            ip = next_ip;
+            break;
+         }
+       }
+       if(m == mounts + NMOUNT) release(&mount_lock);
+    }
+
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
       return 0;
     }
     iunlockput(ip);
     ip = next;
+    
+    // Only check for mount points if we're going to continue traversing
+    // (i.e., if path is not empty, meaning there are more components)
+    if(*path != '\0'){
+      acquire(&mount_lock);
+      for(m = mounts; m < mounts + NMOUNT; m++){
+        if(m->active && m->ip->dev == ip->dev && m->ip->inum == ip->inum){
+           int dev = m->dev;
+           release(&mount_lock);
+           iput(ip);
+           ip = iget(dev, ROOTINO);
+           break;
+        }
+      }
+      if(m == mounts + NMOUNT) release(&mount_lock);
+    }
   }
   if(nameiparent){
     iput(ip);

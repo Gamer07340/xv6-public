@@ -189,6 +189,9 @@ UPROGS=\
 	_ansi_demo\
 	_nano\
 	_more\
+	_mount\
+	_umount\
+	_mkfs_user\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

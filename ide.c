@@ -12,6 +12,7 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
+#include "file.h"
 
 #define SECTOR_SIZE   512
 #define IDE_BSY       0x80
@@ -31,7 +32,7 @@
 static struct spinlock idelock;
 static struct buf *idequeue;
 
-static int havedisk1;
+static int havedisk[2];
 static void idestart(struct buf*);
 
 // Wait for IDE disk to become ready.
@@ -47,6 +48,56 @@ idewait(int checkerr)
   return 0;
 }
 
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+int
+diskread(struct inode *ip, char *dst, int n, int off)
+{
+  int tot, m;
+  struct buf *bp;
+  int dev = ip->minor;
+
+  if(dev >= 2 || !havedisk[dev])
+    return -1;
+
+  for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
+    bp = bget(dev, off/BSIZE);
+    if((bp->flags & B_VALID) == 0) {
+      bp->flags |= B_RAW;
+      iderw(bp);
+    }
+    m = min(n - tot, BSIZE - off%BSIZE);
+    memmove(dst, bp->data + off%BSIZE, m);
+    brelse(bp);
+  }
+  return n;
+}
+
+int
+diskwrite(struct inode *ip, char *src, int n, int off)
+{
+  int tot, m;
+  struct buf *bp;
+  int dev = ip->minor;
+
+  if(dev >= 2 || !havedisk[dev])
+    return -1;
+
+  for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+    bp = bget(dev, off/BSIZE);
+    m = min(n - tot, BSIZE - off%BSIZE);
+    if((bp->flags & B_VALID) == 0 && m < BSIZE) {
+      bp->flags |= B_RAW;
+      iderw(bp);
+    }
+    memmove(bp->data + off%BSIZE, src, m);
+    bp->flags |= B_DIRTY | B_RAW;
+    iderw(bp);
+    brelse(bp);
+  }
+  return n;
+}
+
 void
 ideinit(void)
 {
@@ -56,17 +107,29 @@ ideinit(void)
   ioapicenable(IRQ_IDE, ncpu - 1);
   idewait(0);
 
+  // Check if disk 0 is present
+  outb(0x1f6, 0xe0 | (0<<4));
+  for(i=0; i<1000; i++){
+    if(inb(0x1f7) != 0){
+      havedisk[0] = 1;
+      break;
+    }
+  }
+
   // Check if disk 1 is present
   outb(0x1f6, 0xe0 | (1<<4));
   for(i=0; i<1000; i++){
     if(inb(0x1f7) != 0){
-      havedisk1 = 1;
+      havedisk[1] = 1;
       break;
     }
   }
 
   // Switch back to disk 0.
   outb(0x1f6, 0xe0 | (0<<4));
+
+  devsw[2].read = diskread;
+  devsw[2].write = diskwrite;
 }
 
 // Start the request for b.  Caller must hold idelock.
@@ -75,7 +138,7 @@ idestart(struct buf *b)
 {
   if(b == 0)
     panic("idestart");
-  if(b->blockno >= FSSIZE)
+  if(b->blockno >= FSSIZE && !(b->flags & B_RAW))
     panic("incorrect blockno");
   int sector_per_block =  BSIZE/SECTOR_SIZE;
   int sector = b->blockno * sector_per_block;
@@ -130,7 +193,6 @@ ideintr(void)
   release(&idelock);
 }
 
-//PAGEBREAK!
 // Sync buf with disk.
 // If B_DIRTY is set, write buf to disk, clear B_DIRTY, set B_VALID.
 // Else if B_VALID is not set, read buf from disk, set B_VALID.
@@ -143,8 +205,8 @@ iderw(struct buf *b)
     panic("iderw: buf not locked");
   if((b->flags & (B_VALID|B_DIRTY)) == B_VALID)
     panic("iderw: nothing to do");
-  if(b->dev != 0 && !havedisk1)
-    panic("iderw: ide disk 1 not present");
+  if(b->dev >= 2 || !havedisk[b->dev])
+    panic("iderw: ide disk not present");
 
   acquire(&idelock);  //DOC:acquire-lock
 

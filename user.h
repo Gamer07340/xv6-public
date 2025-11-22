@@ -26,6 +26,9 @@ int uptime(void);
 int crash(void);
 int ps(void);
 int setconsolemode(int);
+int mount(char*, char*);
+int umount(char*);
+int lseek(int, int, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

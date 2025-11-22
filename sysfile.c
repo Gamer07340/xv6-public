@@ -454,3 +454,102 @@ sys_setconsolemode(void)
   console_setmode(mode);
   return 0;
 }
+
+int
+sys_mount(void)
+{
+  char *dev, *dir;
+  struct inode *ip, *devip;
+  int minor;
+
+  if(argstr(0, &dev) < 0 || argstr(1, &dir) < 0)
+    return -1;
+
+  begin_op();
+  if((devip = namei(dev)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(devip);
+  if(devip->type != T_DEV){
+    iunlockput(devip);
+    end_op();
+    return -1;
+  }
+  minor = devip->minor;
+  iunlockput(devip);
+
+  if((ip = namei(dir)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+  if(ip->type != T_DIR){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlock(ip);
+
+  if(mount(ip, minor) < 0){
+    iput(ip);
+    end_op();
+    return -1;
+  }
+
+  iput(ip);
+  end_op();
+  return 0;
+}
+
+int
+sys_umount(void)
+{
+  char *path;
+  struct inode *ip;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  begin_op();
+  if((ip = namei(path)) == 0){
+    end_op();
+    return -1;
+  }
+
+  if(umount(ip) < 0){
+    iput(ip);
+    end_op();
+    return -1;
+  }
+
+  iput(ip);
+  end_op();
+  return 0;
+}
+
+int
+sys_lseek(void)
+{
+  int fd;
+  int offset;
+  int whence;
+  struct file *f;
+
+  if(argfd(0, &fd, &f) < 0 || argint(1, &offset) < 0 || argint(2, &whence) < 0)
+    return -1;
+
+  if(f->type == FD_PIPE)
+    return -1;
+
+  if(whence == 0) // SEEK_SET
+    f->off = offset;
+  else if(whence == 1) // SEEK_CUR
+    f->off += offset;
+  else if(whence == 2) // SEEK_END
+    f->off = f->ip->size + offset;
+  else
+    return -1;
+
+  return f->off;
+}

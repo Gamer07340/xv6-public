@@ -1,19 +1,9 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <assert.h>
-
-#define stat xv6_stat  // avoid clash with host struct stat
 #include "types.h"
-#include "fs.h"
 #include "stat.h"
+#include "user.h"
 #include "param.h"
-
-#ifndef static_assert
-#define static_assert(a, b) do { switch (0) case 0: case (a): ; } while (0)
-#endif
+#include "fs.h"
+#include "fcntl.h"
 
 #define NINODES 200
 
@@ -32,7 +22,6 @@ char zeroes[BSIZE];
 uint freeinode = 1;
 uint freeblock;
 
-
 void balloc(int);
 void wsect(uint, void*);
 void winode(uint, struct dinode*);
@@ -45,23 +34,13 @@ void iappend(uint inum, void *p, int n);
 ushort
 xshort(ushort x)
 {
-  ushort y;
-  uchar *a = (uchar*)&y;
-  a[0] = x;
-  a[1] = x >> 8;
-  return y;
+  return x;
 }
 
 uint
 xint(uint x)
 {
-  uint y;
-  uchar *a = (uchar*)&y;
-  a[0] = x;
-  a[1] = x >> 8;
-  a[2] = x >> 16;
-  a[3] = x >> 24;
-  return y;
+  return x;
 }
 
 int
@@ -73,21 +52,15 @@ main(int argc, char *argv[])
   char buf[BSIZE];
   struct dinode din;
 
-
-  static_assert(sizeof(int) == 4, "Integers must be 4 bytes!");
-
   if(argc < 2){
-    fprintf(stderr, "Usage: mkfs fs.img files...\n");
-    exit(1);
+    printf(2, "Usage: mkfs fs.img files...\n");
+    exit();
   }
 
-  assert((BSIZE % sizeof(struct dinode)) == 0);
-  assert((BSIZE % sizeof(struct dirent)) == 0);
-
-  fsfd = open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666);
+  fsfd = open(argv[1], O_RDWR);
   if(fsfd < 0){
-    perror(argv[1]);
-    exit(1);
+    printf(2, "mkfs: cannot open %s\n", argv[1]);
+    exit();
   }
 
   // 1 fs block = 1 disk sector
@@ -102,7 +75,7 @@ main(int argc, char *argv[])
   sb.inodestart = xint(2+nlog);
   sb.bmapstart = xint(2+nlog+ninodeblocks);
 
-  printf("nmeta %d (boot, super, log blocks %u inode blocks %u, bitmap blocks %u) blocks %d total %d\n",
+  printf(1, "nmeta %d (boot, super, log blocks %u inode blocks %u, bitmap blocks %u) blocks %d total %d\n",
          nmeta, nlog, ninodeblocks, nbitmap, nblocks, FSSIZE);
 
   freeblock = nmeta;     // the first free block that we can allocate
@@ -115,68 +88,67 @@ main(int argc, char *argv[])
   wsect(1, buf);
 
   rootino = ialloc(T_DIR);
-  assert(rootino == ROOTINO);
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(rootino);
   strcpy(de.name, ".");
   iappend(rootino, &de, sizeof(de));
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(rootino);
   strcpy(de.name, "..");
   iappend(rootino, &de, sizeof(de));
 
   // Create /bin
   uint binino = ialloc(T_DIR);
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(binino);
   strcpy(de.name, ".");
   iappend(binino, &de, sizeof(de));
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(rootino);
   strcpy(de.name, "..");
   iappend(binino, &de, sizeof(de));
 
   // Add bin to root
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(binino);
   strcpy(de.name, "bin");
   iappend(rootino, &de, sizeof(de));
 
   // Create /log
   uint logino = ialloc(T_DIR);
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(logino);
   strcpy(de.name, ".");
   iappend(logino, &de, sizeof(de));
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(rootino);
   strcpy(de.name, "..");
   iappend(logino, &de, sizeof(de));
 
   // Add log to root
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(logino);
   strcpy(de.name, "log");
   iappend(rootino, &de, sizeof(de));
 
   // Create /dev
   uint devino = ialloc(T_DIR);
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(devino);
   strcpy(de.name, ".");
   iappend(devino, &de, sizeof(de));
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(rootino);
   strcpy(de.name, "..");
   iappend(devino, &de, sizeof(de));
 
   // Add dev to root
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(devino);
   strcpy(de.name, "dev");
   iappend(rootino, &de, sizeof(de));
@@ -188,7 +160,7 @@ main(int argc, char *argv[])
   din.minor = xshort(1);
   winode(consoleino, &din);
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(consoleino);
   strcpy(de.name, "console");
   iappend(devino, &de, sizeof(de));
@@ -200,7 +172,7 @@ main(int argc, char *argv[])
   din.minor = xshort(0);
   winode(hd0ino, &din);
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(hd0ino);
   strcpy(de.name, "hd0");
   iappend(devino, &de, sizeof(de));
@@ -212,34 +184,33 @@ main(int argc, char *argv[])
   din.minor = xshort(1);
   winode(hd1ino, &din);
 
-  bzero(&de, sizeof(de));
+  memset(&de, 0, sizeof(de));
   de.inum = xshort(hd1ino);
   strcpy(de.name, "hd1");
   iappend(devino, &de, sizeof(de));
 
   for(i = 2; i < argc; i++){
-    assert(index(argv[i], '/') == 0);
-
     if((fd = open(argv[i], 0)) < 0){
-      perror(argv[i]);
-      exit(1);
+      printf(2, "mkfs: cannot open %s\n", argv[i]);
+      exit();
     }
 
     // Skip leading _ in name when writing to file system.
     // The binaries are named _rm, _cat, etc. to keep the
     // build operating system from trying to execute them
     // in place of system binaries like rm and cat.
+    char *name = argv[i];
     uint target_ino = rootino;
-    if(argv[i][0] == '_'){
-      ++argv[i];
+    if(name[0] == '_'){
+      name++;
       target_ino = binino;
     }
 
     inum = ialloc(T_FILE);
 
-    bzero(&de, sizeof(de));
+    memset(&de, 0, sizeof(de));
     de.inum = xshort(inum);
-    strncpy(de.name, argv[i], DIRSIZ);
+    strcpy(de.name, name);
     iappend(target_ino, &de, sizeof(de));
 
     while((cc = read(fd, buf, sizeof(buf))) > 0)
@@ -269,28 +240,21 @@ main(int argc, char *argv[])
   din.size = xint(off);
   winode(logino, &din);
 
-  // fix size of dev inode dir
-  rinode(devino, &din);
-  off = xint(din.size);
-  off = ((off/BSIZE) + 1) * BSIZE;
-  din.size = xint(off);
-  winode(devino, &din);
-
   balloc(freeblock);
 
-  exit(0);
+  exit();
 }
 
 void
 wsect(uint sec, void *buf)
 {
   if(lseek(fsfd, sec * BSIZE, 0) != sec * BSIZE){
-    perror("lseek");
-    exit(1);
+    printf(2, "lseek failed\n");
+    exit();
   }
   if(write(fsfd, buf, BSIZE) != BSIZE){
-    perror("write");
-    exit(1);
+    printf(2, "write failed\n");
+    exit();
   }
 }
 
@@ -325,12 +289,12 @@ void
 rsect(uint sec, void *buf)
 {
   if(lseek(fsfd, sec * BSIZE, 0) != sec * BSIZE){
-    perror("lseek");
-    exit(1);
+    printf(2, "lseek failed\n");
+    exit();
   }
   if(read(fsfd, buf, BSIZE) != BSIZE){
-    perror("read");
-    exit(1);
+    printf(2, "read failed\n");
+    exit();
   }
 }
 
@@ -340,7 +304,7 @@ ialloc(ushort type)
   uint inum = freeinode++;
   struct dinode din;
 
-  bzero(&din, sizeof(din));
+  memset(&din, 0, sizeof(din));
   din.type = xshort(type);
   din.nlink = xshort(1);
   din.size = xint(0);
@@ -354,13 +318,12 @@ balloc(int used)
   uchar buf[BSIZE];
   int i;
 
-  printf("balloc: first %d blocks have been allocated\n", used);
-  assert(used < BSIZE*8);
-  bzero(buf, BSIZE);
+  printf(1, "balloc: first %d blocks have been allocated\n", used);
+  memset(buf, 0, BSIZE);
   for(i = 0; i < used; i++){
     buf[i/8] = buf[i/8] | (0x1 << (i%8));
   }
-  printf("balloc: write bitmap block at sector %d\n", sb.bmapstart);
+  printf(1, "balloc: write bitmap block at sector %d\n", sb.bmapstart);
   wsect(sb.bmapstart, buf);
 }
 
@@ -378,10 +341,8 @@ iappend(uint inum, void *xp, int n)
 
   rinode(inum, &din);
   off = xint(din.size);
-  // printf("append inum %d at off %d sz %d\n", inum, off, n);
   while(n > 0){
     fbn = off / BSIZE;
-    assert(fbn < MAXFILE);
     if(fbn < NDIRECT){
       if(xint(din.addrs[fbn]) == 0){
         din.addrs[fbn] = xint(freeblock++);
@@ -416,7 +377,7 @@ iappend(uint inum, void *xp, int n)
     }
     n1 = min(n, (fbn + 1) * BSIZE - off);
     rsect(x, buf);
-    bcopy(p, buf + off - (fbn * BSIZE), n1);
+    memmove(buf + off - (fbn * BSIZE), p, n1);
     wsect(x, buf);
     n -= n1;
     off += n1;

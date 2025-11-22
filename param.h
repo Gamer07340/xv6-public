@@ -11,4 +11,5 @@
 #define LOGSIZE      (MAXOPBLOCKS*3)  // max data blocks in on-disk log
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       20000  // size of file system in blocks
+#define NMOUNT       10     // maximum number of mounted filesystems
 

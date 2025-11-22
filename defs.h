@@ -13,6 +13,7 @@ struct superblock;
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
+struct buf*     bget(uint, uint);
 void            brelse(struct buf*);
 void            bwrite(struct buf*);
 
@@ -50,6 +51,8 @@ void            iupdate(struct inode*);
 int             namecmp(const char*, const char*);
 struct inode*   namei(char*);
 struct inode*   nameiparent(char*, char*);
+int             mount(struct inode*, int);
+int             umount(struct inode*);
 int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
