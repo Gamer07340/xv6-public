@@ -1,0 +1,15 @@
+.global main
+main:
+  push 14
+  push msg
+  push 1
+  push 0
+  mov eax, 16
+  int 0x40
+  add esp, 16
+  
+  mov eax, 2
+  int 0x40
+
+msg:
+  .string "Hello, World!\n"

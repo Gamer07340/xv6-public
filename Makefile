@@ -186,9 +186,10 @@ UPROGS=\
 	_mount\
 	_umount\
 	_mkfs_user\
+	_asm\
 
 fs.img: mkfs README $(UPROGS)
-	./mkfs fs.img README $(UPROGS) test.sh
+	./mkfs fs.img README $(UPROGS) test.sh hello.code
 
 -include *.d
 
