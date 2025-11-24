@@ -46,6 +46,8 @@ strchr(const char *s, char c)
   for(; *s; s++)
     if(*s == c)
       return (char*)s;
+  if(c == 0)
+    return (char*)s;
   return 0;
 }
 
@@ -103,4 +105,10 @@ memmove(void *vdst, const void *vsrc, int n)
   while(n-- > 0)
     *dst++ = *src++;
   return vdst;
+}
+
+int main(int argc, char *argv[]);
+void _start(int argc, char *argv[]) {
+  main(argc, argv);
+  exit();
 }

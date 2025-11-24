@@ -9,6 +9,7 @@
 #include "spinlock.h"
 #include "sleeplock.h"
 #include "file.h"
+#include "stat.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -86,6 +87,25 @@ filestat(struct file *f, struct stat *st)
   if(f->type == FD_INODE){
     ilock(f->ip);
     stati(f->ip, st);
+
+    // ADD THIS
+    if(st->type == T_FILE)
+      st->mode = 0100000 | 0644;   // S_IFREG
+    else if(st->type == T_DIR)
+      st->mode = 0040000 | 0755;   // S_IFDIR
+    else
+      st->mode = 0644;
+st->uid = 0;
+st->gid = 0;
+st->rdev = 0;
+
+st->blksize = 512;
+st->blocks = (st->size + 511) / 512;
+
+st->atime = ticks;
+st->mtime = ticks;
+st->ctime = ticks;
+
     iunlock(f->ip);
     return 0;
   }

@@ -163,6 +163,67 @@ main(int argc, char *argv[])
   strcpy(de.name, "log");
   iappend(rootino, &de, sizeof(de));
 
+  // Create /etc
+  uint etcino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(etcino);
+  strcpy(de.name, ".");
+  iappend(etcino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(etcino, &de, sizeof(de));
+
+  // Add etc to root
+  bzero(&de, sizeof(de));
+  de.inum = xshort(etcino);
+  strcpy(de.name, "etc");
+  iappend(rootino, &de, sizeof(de));
+
+  // Create /etc/services
+  uint servicesino = ialloc(T_FILE);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(servicesino);
+  strcpy(de.name, "services");
+  iappend(etcino, &de, sizeof(de));
+
+  // Create /var
+  uint varino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(varino);
+  strcpy(de.name, ".");
+  iappend(varino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(varino, &de, sizeof(de));
+
+  // Add var to root
+  bzero(&de, sizeof(de));
+  de.inum = xshort(varino);
+  strcpy(de.name, "var");
+  iappend(rootino, &de, sizeof(de));
+
+  // Create /var/run
+  uint runino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(runino);
+  strcpy(de.name, ".");
+  iappend(runino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(varino);
+  strcpy(de.name, "..");
+  iappend(runino, &de, sizeof(de));
+
+  // Add run to var
+  bzero(&de, sizeof(de));
+  de.inum = xshort(runino);
+  strcpy(de.name, "run");
+  iappend(varino, &de, sizeof(de));
+
   // Create /dev
   uint devino = ialloc(T_DIR);
   bzero(&de, sizeof(de));
@@ -217,8 +278,44 @@ main(int argc, char *argv[])
   strcpy(de.name, "hd1");
   iappend(devino, &de, sizeof(de));
 
+  // Create /usr
+  uint usrino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(usrino);
+  strcpy(de.name, ".");
+  iappend(usrino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(usrino, &de, sizeof(de));
+
+  // Add usr to root
+  bzero(&de, sizeof(de));
+  de.inum = xshort(usrino);
+  strcpy(de.name, "usr");
+  iappend(rootino, &de, sizeof(de));
+
+  // Create /usr/include
+  uint incino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(incino);
+  strcpy(de.name, ".");
+  iappend(incino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(usrino);
+  strcpy(de.name, "..");
+  iappend(incino, &de, sizeof(de));
+
+  // Add include to usr
+  bzero(&de, sizeof(de));
+  de.inum = xshort(incino);
+  strcpy(de.name, "include");
+  iappend(usrino, &de, sizeof(de));
+
   for(i = 2; i < argc; i++){
-    assert(index(argv[i], '/') == 0);
+    // assert(index(argv[i], '/') == 0);
 
     if((fd = open(argv[i], 0)) < 0){
       perror(argv[i]);
@@ -233,6 +330,8 @@ main(int argc, char *argv[])
     if(argv[i][0] == '_'){
       ++argv[i];
       target_ino = binino;
+    } else if (strlen(argv[i]) > 2 && strcmp(argv[i] + strlen(argv[i]) - 2, ".h") == 0) {
+      target_ino = incino;
     }
 
     inum = ialloc(T_FILE);
@@ -262,12 +361,47 @@ main(int argc, char *argv[])
   din.size = xint(off);
   winode(binino, &din);
 
+  // fix size of usr inode dir
+  rinode(usrino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(usrino, &din);
+
+  // fix size of include inode dir
+  rinode(incino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(incino, &din);
+
   // fix size of log inode dir
   rinode(logino, &din);
   off = xint(din.size);
   off = ((off/BSIZE) + 1) * BSIZE;
   din.size = xint(off);
   winode(logino, &din);
+
+  // fix size of etc inode dir
+  rinode(etcino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(etcino, &din);
+
+  // fix size of var inode dir
+  rinode(varino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(varino, &din);
+
+  // fix size of run inode dir
+  rinode(runino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(runino, &din);
 
   // fix size of dev inode dir
   rinode(devino, &din);

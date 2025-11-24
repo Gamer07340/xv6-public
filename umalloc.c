@@ -26,7 +26,17 @@ free(void *ap)
 {
   Header *bp, *p;
 
+  if(ap == 0)
+    return;
+  
   bp = (Header*)ap - 1;
+  
+  // Initialize freep if this is the first free call
+  if(freep == 0){
+    base.s.ptr = freep = &base;
+    base.s.size = 0;
+  }
+  
   for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
     if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
       break;

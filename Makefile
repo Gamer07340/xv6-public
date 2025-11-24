@@ -160,6 +160,12 @@ _forktest: forktest.o $(ULIB)
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
 
+_tcc: tcc/tcc.c tcc/libc_compat.c $(ULIB)
+	$(CC) $(CFLAGS) -Wno-error -DTCC_TARGET_I386 -DONE_SOURCE -DCONFIG_TCCDIR=\"/lib/tcc\" -DTCC_VERSION=\"0.9.27\" -Itcc/include -I. -Itcc -c tcc/tcc.c
+	$(CC) $(CFLAGS) -Wno-error -Itcc/include -I. -Itcc -c tcc/libc_compat.c
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _tcc tcc.o libc_compat.o ulib.o usys.o umalloc.o ansi.o $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
+	$(OBJDUMP) -S _tcc > tcc.asm
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
@@ -187,9 +193,11 @@ UPROGS=\
 	_umount\
 	_mkfs_user\
 	_asm\
+	_tcc\
+	_compile\
 
-fs.img: mkfs README $(UPROGS)
-	./mkfs fs.img README $(UPROGS) test.sh hello.code
+fs.img: mkfs README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
+	./mkfs fs.img README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
 
 -include *.d
 
