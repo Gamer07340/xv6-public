@@ -392,3 +392,13 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 //PAGEBREAK!
 // Blank page.
 
+// Map VGA memory (0xA0000) to virtual address va.
+int
+mapvga(pde_t *pgdir, uint va)
+{
+  uint pa = 0xA0000;
+  uint size = 64*1024; // 64KB
+  if(mappages(pgdir, (void*)va, size, pa, PTE_W|PTE_U) < 0)
+    return -1;
+  return 0;
+}

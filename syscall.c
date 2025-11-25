@@ -109,6 +109,8 @@ extern int sys_setconsolemode(void);
 extern int sys_mount(void);
 extern int sys_umount(void);
 extern int sys_lseek(void);
+extern int sys_setvideomode(void);
+extern int sys_mapvga(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -138,6 +140,8 @@ static int (*syscalls[])(void) = {
 [SYS_mount]   sys_mount,
 [SYS_umount]  sys_umount,
 [SYS_lseek]   sys_lseek,
+[SYS_setvideomode] sys_setvideomode,
+[SYS_mapvga]   sys_mapvga,
 };
 
 void

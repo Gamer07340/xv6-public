@@ -278,6 +278,18 @@ main(int argc, char *argv[])
   strcpy(de.name, "hd1");
   iappend(devino, &de, sizeof(de));
 
+  // Create /dev/mouse
+  uint mouseino = ialloc(T_DEV);
+  rinode(mouseino, &din);
+  din.major = xshort(3);
+  din.minor = xshort(0);
+  winode(mouseino, &din);
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(mouseino);
+  strcpy(de.name, "mouse");
+  iappend(devino, &de, sizeof(de));
+
   // Create /usr
   uint usrino = ialloc(T_DIR);
   bzero(&de, sizeof(de));

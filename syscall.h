@@ -26,3 +26,5 @@
 #define SYS_mount  25
 #define SYS_umount 26
 #define SYS_lseek  27
+#define SYS_setvideomode 28
+#define SYS_mapvga 29

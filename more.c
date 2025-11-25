@@ -42,7 +42,7 @@ more(int fd_in, int fd_cmd)
 int
 main(int argc, char *argv[])
 {
-  int fd_cmd = open("console", O_RDONLY);
+  int fd_cmd = open("/dev/console", O_RDONLY);
   if(fd_cmd < 0){
       printf(2, "more: cannot open console\n");
       exit();

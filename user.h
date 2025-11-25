@@ -29,6 +29,8 @@ int setconsolemode(int);
 int mount(char*, char*);
 int umount(char*);
 int lseek(int, int, int);
+int setvideomode(int);
+int mapvga(void*);
 
 // ulib.c
 int stat(const char*, struct stat*);

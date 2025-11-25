@@ -27,6 +27,8 @@ OBJS = \
 	uart.o\
 	vectors.o\
 	vm.o\
+	vga.o\
+	mouse.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf
@@ -195,6 +197,7 @@ UPROGS=\
 	_asm\
 	_tcc\
 	_compile\
+	_guiserver\
 
 fs.img: mkfs README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
 	./mkfs fs.img README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h

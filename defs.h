@@ -190,6 +190,16 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+int             mapvga(pde_t *pgdir, uint va);
+
+// vga.c
+void            vga_init(void);
+void            vga_set_mode(int);
+
+// mouse.c
+void            mouse_init(void);
+void            mouseintr(void);
+int             mouseread(struct inode*, char*, int, int);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

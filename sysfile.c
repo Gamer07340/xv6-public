@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -552,4 +553,25 @@ sys_lseek(void)
     return -1;
 
   return f->off;
+}
+
+int
+sys_setvideomode(void)
+{
+  int mode;
+  if(argint(0, &mode) < 0)
+    return -1;
+  vga_set_mode(mode);
+  return 0;
+}
+
+int
+sys_mapvga(void)
+{
+  int va;
+  if(argint(0, &va) < 0)
+    return -1;
+  if((uint)va >= KERNBASE || (uint)va + 64*1024 > KERNBASE)
+    return -1;
+  return mapvga(myproc()->pgdir, (uint)va);
 }

@@ -161,3 +161,15 @@ lseek:
   movl $27, %eax
   int $64
   ret
+
+.globl setvideomode
+setvideomode:
+  movl $28, %eax
+  int $64
+  ret
+
+.globl mapvga
+mapvga:
+  movl $29, %eax
+  int $64
+  ret
