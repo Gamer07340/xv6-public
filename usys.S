@@ -173,3 +173,33 @@ mapvga:
   movl $29, %eax
   int $64
   ret
+
+.globl socket
+socket:
+  movl $30, %eax
+  int $64
+  ret
+
+.globl connect
+connect:
+  movl $31, %eax
+  int $64
+  ret
+
+.globl send
+send:
+  movl $32, %eax
+  int $64
+  ret
+
+.globl recv
+recv:
+  movl $33, %eax
+  int $64
+  ret
+
+.globl close_socket
+close_socket:
+  movl $34, %eax
+  int $64
+  ret

@@ -386,6 +386,9 @@ consoleinit(void)
   devsw[CONSOLE].read = consoleread;
   cons.locking = 1;
 
-  ioapicenable(IRQ_KBD, 0);
+  if(lapic)
+    ioapicenable(IRQ_KBD, 0);
+  else
+    picenable(IRQ_KBD);
 }
 

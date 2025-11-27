@@ -12,29 +12,40 @@
 start:
   cli                         # BIOS enabled interrupts; disable
 
-  # Zero data segment registers DS, ES, and SS.
-  xorw    %ax,%ax             # Set %ax to zero
-  movw    %ax,%ds             # -> Data Segment
-  movw    %ax,%es             # -> Extra Segment
-  movw    %ax,%ss             # -> Stack Segment
+  # Normalize CS:IP - use a simpler approach
+  # Jump to set CS=0
+  xorw    %ax,%ax
+  movw    %ax,%ds
+  movw    %ax,%es
+  movw    %ax,%ss
+  movw    $0x7c00,%sp         # Set up stack pointer
 
   # Physical address line A20 is tied to zero so that the first PCs 
   # with 2 MB would run software that assumed 1 MB.  Undo that.
+  # Use keyboard controller method with timeout
+  
+  movw    $0x1000, %cx        # Timeout counter
 seta20.1:
-  inb     $0x64,%al               # Wait for not busy
+  inb     $0x64,%al           # Wait for not busy
   testb   $0x2,%al
-  jnz     seta20.1
+  loopnz  seta20.1            # Loop while busy and counter > 0
 
-  movb    $0xd1,%al               # 0xd1 -> port 0x64
+  movb    $0xd1,%al           # 0xd1 -> port 0x64
   outb    %al,$0x64
 
+  movw    $0x1000, %cx        # Timeout counter
 seta20.2:
-  inb     $0x64,%al               # Wait for not busy
+  inb     $0x64,%al           # Wait for not busy
   testb   $0x2,%al
-  jnz     seta20.2
+  loopnz  seta20.2            # Loop while busy and counter > 0
 
-  movb    $0xdf,%al               # 0xdf -> port 0x60
+  movb    $0xdf,%al           # 0xdf -> port 0x60
   outb    %al,$0x60
+  
+  # Small delay for hardware to settle
+  movw    $0x100, %cx
+seta20.3:
+  loop    seta20.3
 
   # Switch from real to protected mode.  Use a bootstrap GDT that makes
   # virtual addresses map directly to physical addresses so that the
@@ -84,5 +95,5 @@ gdt:
 
 gdtdesc:
   .word   (gdtdesc - gdt - 1)             # sizeof(gdt) - 1
-  .long   gdt                             # address gdt
+  .long   gdt - start + 0x7c00            # address gdt (absolute)
 

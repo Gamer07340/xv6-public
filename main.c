@@ -23,6 +23,7 @@ main(void)
   lapicinit();     // interrupt controller
   seginit();       // segment descriptors
   picinit();       // disable pic
+  timerinit();     // programmable interval timer
   ioapicinit();    // another interrupt controller
   consoleinit();   // console hardware
   uartinit();      // serial port
@@ -33,6 +34,8 @@ main(void)
   binit();         // buffer cache
   fileinit();      // file table
   ideinit();       // disk 
+  e1000_init();    // ethernet
+  socket_init();   // network sockets
   startothers();   // start other processors
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
   userinit();      // first user process

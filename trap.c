@@ -54,32 +54,38 @@ trap(struct trapframe *tf)
       wakeup(&ticks);
       release(&tickslock);
     }
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
     break;
   case T_IRQ0 + IRQ_IDE:
     ideintr();
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
     break;
   case T_IRQ0 + IRQ_IDE+1:
     // Bochs generates spurious IDE1 interrupts.
     break;
   case T_IRQ0 + IRQ_KBD:
     kbdintr();
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
     break;
   case T_IRQ0 + IRQ_COM1:
     uartintr();
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
     break;
   case T_IRQ0 + IRQ_MOUSE:
     mouseintr();
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
     break;
   case T_IRQ0 + 7:
   case T_IRQ0 + IRQ_SPURIOUS:
     cprintf("cpu%d: spurious interrupt at %x:%x\n",
             cpuid(), tf->cs, tf->eip);
-    lapiceoi();
+    if(lapic) lapiceoi(); else piceoi();
+    break;
+  
+  // E1000 Interrupt (IRQ 11)
+  case T_IRQ0 + 11:
+    e1000_intr();
+    if(lapic) lapiceoi(); else piceoi();
     break;
 
   //PAGEBREAK: 13

@@ -28,3 +28,8 @@
 #define SYS_lseek  27
 #define SYS_setvideomode 28
 #define SYS_mapvga 29
+#define SYS_socket 30
+#define SYS_connect 31
+#define SYS_send 32
+#define SYS_recv 33
+#define SYS_close_socket 34

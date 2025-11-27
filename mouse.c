@@ -66,7 +66,10 @@ mouse_init(void)
   mousecmd(0xF6); // Set defaults
   mousecmd(0xF4); // Enable data reporting
 
-  ioapicenable(MOUSE_IRQ, 0);
+  if(lapic)
+    ioapicenable(MOUSE_IRQ, 0);
+  else
+    picenable(MOUSE_IRQ);
 
   devsw[MOUSE].read = mouseread;
 }

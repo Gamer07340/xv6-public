@@ -98,8 +98,14 @@ mpinit(void)
   struct mpproc *proc;
   struct mpioapic *ioapic;
 
-  if((conf = mpconfig(&mp)) == 0)
-    panic("Expect to run on an SMP");
+  if((conf = mpconfig(&mp)) == 0){
+    cprintf("mpinit: SMP not detected, running in single cpu mode\n");
+    ncpu = 1;
+    cpus[0].apicid = 0;
+    lapic = 0;
+    ioapicid = 0;
+    return;
+  }
   ismp = 1;
   lapic = (uint*)conf->lapicaddr;
   for(p=(uchar*)(conf+1), e=(uchar*)conf+conf->length; p<e; ){
@@ -127,8 +133,14 @@ mpinit(void)
       break;
     }
   }
-  if(!ismp)
-    panic("Didn't find a suitable machine");
+  if(!ismp){
+    cprintf("mpinit: Didn't find a suitable machine, running in single cpu mode\n");
+    ncpu = 1;
+    cpus[0].apicid = 0;
+    lapic = 0;
+    ioapicid = 0;
+    return;
+  }
 
   if(mp->imcrp){
     // Bochs doesn't support IMCR, so this doesn't run on Bochs.

@@ -98,6 +98,7 @@ void            mpinit(void);
 // picirq.c
 void            picenable(int);
 void            picinit(void);
+void            piceoi(void);
 
 // pipe.c
 int             pipealloc(struct file**, struct file**);
@@ -191,6 +192,13 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 int             mapvga(pde_t *pgdir, uint va);
+
+// e1000.c
+void            e1000_init(void);
+void            e1000_intr(void);
+
+// net.c
+void            socket_init(void);
 
 // vga.c
 void            vga_init(void);

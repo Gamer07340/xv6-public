@@ -111,6 +111,11 @@ extern int sys_umount(void);
 extern int sys_lseek(void);
 extern int sys_setvideomode(void);
 extern int sys_mapvga(void);
+extern int sys_socket(void);
+extern int sys_connect(void);
+extern int sys_send(void);
+extern int sys_recv(void);
+extern int sys_close_socket(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -142,6 +147,11 @@ static int (*syscalls[])(void) = {
 [SYS_lseek]   sys_lseek,
 [SYS_setvideomode] sys_setvideomode,
 [SYS_mapvga]   sys_mapvga,
+[SYS_socket]   sys_socket,
+[SYS_connect]  sys_connect,
+[SYS_send]     sys_send,
+[SYS_recv]     sys_recv,
+[SYS_close_socket] sys_close_socket,
 };
 
 void

@@ -24,11 +24,15 @@ OBJS = \
 	sysproc.o\
 	trapasm.o\
 	trap.o\
+	timer.o\
 	uart.o\
 	vectors.o\
 	vm.o\
 	vga.o\
 	mouse.o\
+	e1000.o\
+	net.o\
+	sysnet.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf
@@ -98,6 +102,9 @@ xv6.img: bootblock kernel fs.img
 	dd if=kernel of=xv6.img seek=1 conv=notrunc
 	dd if=fs.img of=xv6.img seek=1000 conv=notrunc
 
+xv6.vdi: xv6.img
+	VBoxManage convertfromraw xv6.img xv6.vdi --format=VDI
+
 xv6memfs.img: bootblock kernelmemfs
 	dd if=/dev/zero of=xv6memfs.img count=10000
 	dd if=bootblock of=xv6memfs.img conv=notrunc
@@ -162,6 +169,20 @@ _forktest: forktest.o $(ULIB)
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
 
+# Special rules for network programs that need dns.c
+_ping: ping.o dns.o $(ULIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _ping ping.o dns.o $(ULIB)
+	$(OBJDUMP) -S _ping > ping.asm
+	$(OBJDUMP) -t _ping | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > ping.sym
+
+_wget: wget.o dns.o $(ULIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _wget wget.o dns.o $(ULIB)
+	$(OBJDUMP) -S _wget > wget.asm
+	$(OBJDUMP) -t _wget | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > wget.sym
+
+dns.o: dns.c
+	$(CC) $(CFLAGS) -c dns.c
+
 _tcc: tcc/tcc.c tcc/libc_compat.c $(ULIB)
 	$(CC) $(CFLAGS) -Wno-error -DTCC_TARGET_I386 -DONE_SOURCE -DCONFIG_TCCDIR=\"/lib/tcc\" -DTCC_VERSION=\"0.9.27\" -Itcc/include -I. -Itcc -c tcc/tcc.c
 	$(CC) $(CFLAGS) -Wno-error -Itcc/include -I. -Itcc -c tcc/libc_compat.c
@@ -198,6 +219,8 @@ UPROGS=\
 	_tcc\
 	_compile\
 	_guiserver\
+	_ping\
+	_wget\
 
 fs.img: mkfs README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
 	./mkfs fs.img README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
@@ -236,7 +259,14 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 ifndef CPUS
 CPUS := 2
 endif
-QEMUOPTS = -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
+
+# Network options:
+# - user mode with ICMP echo (ping) enabled via restrict=off
+# - This allows ICMP packets to be forwarded to external hosts
+# Note: Some QEMU versions may not support all ICMP forwarding
+QEMUOPTS = -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA) \
+	-netdev user,id=net0,restrict=off \
+	-device e1000,netdev=net0
 
 qemu: xv6.img
 	$(QEMU) -serial mon:stdio $(QEMUOPTS)

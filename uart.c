@@ -41,7 +41,10 @@ uartinit(void)
   // enable interrupts.
   inb(COM1+2);
   inb(COM1+0);
-  ioapicenable(IRQ_COM1, 0);
+  if(lapic)
+    ioapicenable(IRQ_COM1, 0);
+  else
+    picenable(IRQ_COM1);
 
   // Announce that we're here.
   for(p="xv6...\n"; *p; p++)

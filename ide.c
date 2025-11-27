@@ -104,7 +104,10 @@ ideinit(void)
   int i;
 
   initlock(&idelock, "ide");
-  ioapicenable(IRQ_IDE, ncpu - 1);
+  if(lapic)
+    ioapicenable(IRQ_IDE, ncpu - 1);
+  else
+    picenable(IRQ_IDE);
   idewait(0);
 
   // Check if disk 0 is present

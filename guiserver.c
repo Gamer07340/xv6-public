@@ -49,24 +49,10 @@ main(int argc, char *argv[])
   }
 
   // Map VGA memory to a fixed address in user space
-  // We'll use 0x40000000 (1GB) as a safe bet, or just allocate a buffer and use its address?
-  // No, mapvga maps physical 0xA0000 to the given VA.
-  // We need to pick a VA that is not used.
-  // The heap grows from end.
-  // Let's pick a high address, e.g., 0x60000000.
-  // Wait, KERNBASE is 0x80000000.
-  // 0x60000000 should be fine.
   vga_mem = (uchar*)0x60000000;
-  if(mapvga(vga_mem) < 0){
-    // If mapping fails, maybe try sbrk?
-    // But mapvga should work if the page table entry is free.
-    // Let's try.
-    // If it fails, we might need to allocate the page first?
-    // My mapvga implementation allocates page table pages if needed.
-    // So it should work.
+  if(mapvga((int)vga_mem) < 0){
     printf(1, "Failed to map VGA memory\n");
-    // Try to continue anyway? No point.
-    // exit();
+    exit();
   }
 
   fd = open("/dev/mouse", O_RDONLY);

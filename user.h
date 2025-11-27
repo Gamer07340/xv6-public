@@ -30,7 +30,12 @@ int mount(char*, char*);
 int umount(char*);
 int lseek(int, int, int);
 int setvideomode(int);
-int mapvga(void*);
+int mapvga(int);
+int socket(int);
+int connect(int, unsigned int, int);
+int send(int, void*, int);
+int recv(int, void*, int);
+int close_socket(int);
 
 // ulib.c
 int stat(const char*, struct stat*);
