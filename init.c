@@ -4,7 +4,7 @@
 #include "fcntl.h"
 #include "fs.h"
 
-char *sh_argv[] = { "sh", 0 };
+char *login_argv[] = { "login", 0 };
 int sh_pid = 0;
 
 void
@@ -197,17 +197,17 @@ list_services()
 }
 
 void
-start_sh()
+start_login()
 {
-  printf(1, "init: starting sh\n");
+  printf(1, "init: starting login\n");
   sh_pid = fork();
   if(sh_pid < 0){
     printf(1, "init: fork failed\n");
     exit();
   }
   if(sh_pid == 0){
-    exec("sh", sh_argv);
-    printf(1, "init: exec sh failed\n");
+    exec("login", login_argv);
+    printf(1, "init: exec login failed\n");
     exit();
   }
 }
@@ -260,12 +260,12 @@ main(int argc, char *argv[])
       close(fd);
   }
 
-  start_sh();
+  start_login();
 
   for(;;){
     int wpid = wait();
     if(wpid == sh_pid){
-      start_sh();
+      start_login();
     } else if(wpid > 0){
       int dfd = open("/var/run", O_RDONLY);
       if(dfd >= 0){

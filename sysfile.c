@@ -19,6 +19,36 @@
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
+
+// Check if the current process has permission to access inode ip
+// with the given mode (O_RDONLY, O_WRONLY, O_RDWR, or 1 for exec).
+// Returns 0 on success, -1 on failure.
+int
+checkperm(struct inode *ip, int mode)
+{
+  struct proc *curproc = myproc();
+  if(curproc->uid == 0)
+    return 0; // Root can do anything
+
+  int needed = 0;
+  if(mode & O_WRONLY) needed |= 2;
+  else if(mode & O_RDWR) needed |= 6;
+  else if(mode & 1) needed |= 1; // Execute
+  else needed |= 4; // O_RDONLY
+
+  int perms = 0;
+  if(curproc->uid == ip->uid)
+    perms = (ip->mode >> 6) & 7;
+  else if(curproc->gid == ip->gid)
+    perms = (ip->mode >> 3) & 7;
+  else
+    perms = ip->mode & 7;
+
+  if((needed & perms) == needed)
+    return 0;
+  return -1;
+}
+
 static int
 argfd(int n, int *pfd, struct file **pf)
 {
@@ -149,6 +179,10 @@ sys_link(void)
     iunlockput(dp);
     goto bad;
   }
+  if(checkperm(dp, O_WRONLY) < 0){
+    iunlockput(dp);
+    goto bad;
+  }
   iunlockput(dp);
   iput(ip);
 
@@ -201,6 +235,12 @@ sys_unlink(void)
 
   ilock(dp);
 
+  if(checkperm(dp, O_WRONLY) < 0){
+    iunlockput(dp);
+    end_op();
+    return -1;
+  }
+
   // Cannot unlink "." or "..".
   if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
     goto bad;
@@ -248,6 +288,10 @@ create(char *path, short type, short major, short minor)
   if((dp = nameiparent(path, name)) == 0)
     return 0;
   ilock(dp);
+  if(checkperm(dp, O_WRONLY) < 0){
+    iunlockput(dp);
+    return 0;
+  }
 
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
@@ -309,6 +353,16 @@ sys_open(void)
     }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    if(ip->type == T_DIR && omode != O_RDONLY){
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    if(checkperm(ip, omode) < 0){
       iunlockput(ip);
       end_op();
       return -1;
@@ -574,4 +628,186 @@ sys_mapvga(void)
   if((uint)va >= KERNBASE || (uint)va + 64*1024 > KERNBASE)
     return -1;
   return mapvga(myproc()->pgdir, (uint)va);
+}
+
+int
+sys_chown(void)
+{
+  char *path;
+  int uid, gid;
+  struct inode *ip;
+
+  if(argstr(0, &path) < 0 || argint(1, &uid) < 0 || argint(2, &gid) < 0)
+    return -1;
+
+  begin_op();
+  if((ip = namei(path)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+  if(myproc()->uid != 0 && myproc()->uid != ip->uid){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  ip->uid = uid;
+  ip->gid = gid;
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
+
+int
+sys_chmod(void)
+{
+  char *path;
+  int mode;
+  struct inode *ip;
+
+  if(argstr(0, &path) < 0 || argint(1, &mode) < 0)
+    return -1;
+
+  begin_op();
+  if((ip = namei(path)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+  if(myproc()->uid != 0 && myproc()->uid != ip->uid){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  // Preserve high bits (file type) if any
+  ip->mode = (ip->mode & ~0777) | (mode & 0777);
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
+
+extern struct mount mounts[NMOUNT];
+extern struct spinlock mount_lock;
+
+static int
+namebyinum(struct inode *dp, uint inum, char *name)
+{
+  struct dirent de;
+  uint off;
+
+  for(off = 0; off < dp->size; off += sizeof(de)){
+    if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+      panic("namebyinum: readi");
+    if(de.inum == inum){
+      strncpy(name, de.name, DIRSIZ);
+      name[DIRSIZ] = 0;
+      return 0;
+    }
+  }
+  return -1;
+}
+
+int
+sys_getcwd(void)
+{
+  char *buf;
+  int size;
+  struct inode *ip, *pip;
+  char name[DIRSIZ+1];
+  struct proc *curproc = myproc();
+  char temp[512];
+  int pos = 512 - 1;
+  int i;
+
+  if(argptr(0, &buf, 1) < 0 || argint(1, &size) < 0)
+    return -1;
+
+  if(size < 2) return -1;
+
+  ip = idup(curproc->cwd);
+  temp[pos] = 0;
+
+  begin_op();
+
+  while(1){
+    ilock(ip);
+    pip = dirlookup(ip, "..", 0);
+    if(pip == 0){
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    
+    if(ip->dev == pip->dev && ip->inum == pip->inum){
+      // We are at a root. Check if it's a mount point.
+      int found = 0;
+      acquire(&mount_lock);
+      for(i = 0; i < NMOUNT; i++){
+        if(mounts[i].active && mounts[i].dev == ip->dev){
+          // Found mount point
+          struct inode *mnt_ip = mounts[i].ip;
+          if(mnt_ip){
+             // Switch to mount point inode
+             iunlockput(pip); // Put the ".." (which is same as ip)
+             iunlockput(ip);  // Put the current root
+             ip = idup(mnt_ip); // Switch to mount point
+             found = 1;
+             break;
+          }
+        }
+      }
+      release(&mount_lock);
+      
+      if(found) continue; // Continue with new ip (mount point)
+      
+      // Real root
+      iunlockput(pip);
+      iunlockput(ip);
+      break;
+    }
+    
+    iunlock(ip);
+    ilock(pip);
+    
+    if(namebyinum(pip, ip->inum, name) < 0){
+      iunlockput(pip);
+      iput(ip);
+      end_op();
+      return -1;
+    }
+    
+    int len = strlen(name);
+    if(pos - len - 1 < 0){
+      iunlockput(pip);
+      iput(ip);
+      end_op();
+      return -1;
+    }
+    
+    pos -= len;
+    memmove(temp + pos, name, len);
+    pos--;
+    temp[pos] = '/';
+    
+    iunlock(pip);
+    iput(ip);
+    ip = pip;
+  }
+  
+  end_op();
+  
+  if(pos == 512 - 1) {
+    if(pos - 1 < 0) return -1;
+    pos--;
+    temp[pos] = '/';
+  }
+  
+  if(size < 512 - pos){
+    return -1;
+  }
+  
+  memmove(buf, temp + pos, 512 - pos);
+  return 0;
 }

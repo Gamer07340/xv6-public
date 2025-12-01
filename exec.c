@@ -41,6 +41,11 @@ exec(char *path, char **argv)
     }
   }
   ilock(ip);
+  if(checkperm(ip, 1) < 0){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
   pgdir = 0;
 
   // Check ELF header

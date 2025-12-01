@@ -203,3 +203,45 @@ close_socket:
   movl $34, %eax
   int $64
   ret
+
+.globl getuid
+getuid:
+  movl $35, %eax
+  int $64
+  ret
+
+.globl setuid
+setuid:
+  movl $36, %eax
+  int $64
+  ret
+
+.globl getgid
+getgid:
+  movl $37, %eax
+  int $64
+  ret
+
+.globl setgid
+setgid:
+  movl $38, %eax
+  int $64
+  ret
+
+.globl chown
+chown:
+  movl $39, %eax
+  int $64
+  ret
+
+.globl chmod
+chmod:
+  movl $40, %eax
+  int $64
+  ret
+
+.globl getcwd
+getcwd:
+  movl $41, %eax
+  int $64
+  ret

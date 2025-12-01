@@ -36,6 +36,13 @@ int connect(int, unsigned int, int);
 int send(int, void*, int);
 int recv(int, void*, int);
 int close_socket(int);
+int getuid(void);
+int setuid(int);
+int getgid(void);
+int setgid(int);
+int chown(const char*, int, int);
+int chmod(const char*, int);
+int getcwd(char*, int);
 
 // ulib.c
 int stat(const char*, struct stat*);
@@ -50,3 +57,4 @@ void* memset(void*, int, unsigned int);
 void* malloc(unsigned int);
 void free(void*);
 int atoi(const char*);
+char* strcat(char*, const char*);

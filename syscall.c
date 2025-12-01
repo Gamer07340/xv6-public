@@ -116,6 +116,13 @@ extern int sys_connect(void);
 extern int sys_send(void);
 extern int sys_recv(void);
 extern int sys_close_socket(void);
+extern int sys_getuid(void);
+extern int sys_setuid(void);
+extern int sys_getgid(void);
+extern int sys_setgid(void);
+extern int sys_chown(void);
+extern int sys_chmod(void);
+extern int sys_getcwd(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -152,6 +159,13 @@ static int (*syscalls[])(void) = {
 [SYS_send]     sys_send,
 [SYS_recv]     sys_recv,
 [SYS_close_socket] sys_close_socket,
+[SYS_getuid]   sys_getuid,
+[SYS_setuid]   sys_setuid,
+[SYS_getgid]   sys_getgid,
+[SYS_setgid]   sys_setgid,
+[SYS_chown]    sys_chown,
+[SYS_chmod]    sys_chmod,
+[SYS_getcwd]   sys_getcwd,
 };
 
 void

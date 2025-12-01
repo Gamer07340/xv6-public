@@ -102,3 +102,41 @@ sys_ps(void)
 {
   return cps();
 }
+
+int
+sys_getuid(void)
+{
+  return myproc()->uid;
+}
+
+int
+sys_setuid(void)
+{
+  int uid;
+  if(argint(0, &uid) < 0)
+    return -1;
+  // Only root can change UID
+  if(myproc()->uid != 0)
+    return -1;
+  myproc()->uid = uid;
+  return 0;
+}
+
+int
+sys_getgid(void)
+{
+  return myproc()->gid;
+}
+
+int
+sys_setgid(void)
+{
+  int gid;
+  if(argint(0, &gid) < 0)
+    return -1;
+  // Only root can change GID
+  if(myproc()->uid != 0)
+    return -1;
+  myproc()->gid = gid;
+  return 0;
+}

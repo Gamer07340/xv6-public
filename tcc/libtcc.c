@@ -991,11 +991,11 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
     if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
         !s->nostdlib) {
         /* Add xv6 runtime source files - TCC will compile them */
-        tcc_add_file(s, "ulib.c");
-        tcc_add_file(s, "printf.c");
-        tcc_add_file(s, "umalloc.c");
-        tcc_add_file(s, "ansi.c");
-        tcc_add_file(s, "usys.S");
+        tcc_add_file(s, "/usr/lib/ulib.c");
+        tcc_add_file(s, "/usr/lib/printf.c");
+        tcc_add_file(s, "/usr/lib/umalloc.c");
+        tcc_add_file(s, "/usr/lib/ansi.c");
+        tcc_add_file(s, "/usr/lib/usys.S");
     }
 #endif
     return 0;

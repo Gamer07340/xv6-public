@@ -25,6 +25,9 @@ struct inode {
   short minor;
   short nlink;
   uint size;
+  uint uid;
+  uint gid;
+  uint mode;
   uint addrs[NDIRECT+2];
 };
 
@@ -39,5 +42,12 @@ extern struct devsw devsw[];
 
 #define CONSOLE 1
 #define MOUSE   3
+
+struct mount {
+  int active;
+  int dev;
+  struct superblock sb;
+  struct inode *ip;
+};
 
 #endif

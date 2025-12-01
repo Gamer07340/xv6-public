@@ -33,3 +33,10 @@
 #define SYS_send 32
 #define SYS_recv 33
 #define SYS_close_socket 34
+#define SYS_getuid 35
+#define SYS_setuid 36
+#define SYS_getgid 37
+#define SYS_setgid 38
+#define SYS_chown  39
+#define SYS_chmod  40
+#define SYS_getcwd 41

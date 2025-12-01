@@ -23,12 +23,29 @@ fmtname(char *path)
 }
 
 void
+fmtmode(int mode, char *buf)
+{
+  strcpy(buf, "---------");
+  if(mode & T_DIR) buf[0] = 'd';
+  if(mode & 0400) buf[1] = 'r';
+  if(mode & 0200) buf[2] = 'w';
+  if(mode & 0100) buf[3] = 'x';
+  if(mode & 0040) buf[4] = 'r';
+  if(mode & 0020) buf[5] = 'w';
+  if(mode & 0010) buf[6] = 'x';
+  if(mode & 0004) buf[7] = 'r';
+  if(mode & 0002) buf[8] = 'w';
+  if(mode & 0001) buf[9] = 'x';
+}
+
+void
 ls(char *path)
 {
   char buf[512], *p;
   int fd;
   struct dirent de;
   struct stat st;
+  char modebuf[11];
 
   if((fd = open(path, 0)) < 0){
     printf(2, "ls: cannot open %s\n", path);
@@ -43,7 +60,8 @@ ls(char *path)
 
   switch(st.type){
   case T_FILE:
-    printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
+    fmtmode(st.mode, modebuf);
+    printf(1, "%s %s %d %d %d %d\n", fmtname(path), modebuf, st.nlink, st.uid, st.gid, st.size);
     break;
 
   case T_DIR:
@@ -63,7 +81,8 @@ ls(char *path)
         printf(1, "ls: cannot stat %s\n", buf);
         continue;
       }
-      printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+      fmtmode(st.mode, modebuf);
+      printf(1, "%s %s %d %d %d %d\n", fmtname(buf), modebuf, st.nlink, st.uid, st.gid, st.size);
     }
     break;
   }

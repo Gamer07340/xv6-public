@@ -308,6 +308,9 @@ ialloc(ushort type)
   din.type = xshort(type);
   din.nlink = xshort(1);
   din.size = xint(0);
+  din.uid = xint(0);
+  din.gid = xint(0);
+  din.mode = xint(type == T_DIR ? 0755 : 0644);
   winode(inum, &din);
   return inum;
 }

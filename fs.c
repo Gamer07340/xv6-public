@@ -27,12 +27,9 @@ static void itrunc(struct inode*);
 // only one device
 struct superblock sb; 
 
-struct mount {
-  int active;
-  int dev;
-  struct superblock sb;
-  struct inode *ip;
-} mounts[NMOUNT];
+struct mount mounts[NMOUNT]; 
+
+
 
 struct spinlock mount_lock;
 
@@ -240,6 +237,9 @@ ialloc(uint dev, short type)
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
       dip->type = type;
+      dip->uid = 0;
+      dip->gid = 0;
+      dip->mode = (type == T_DIR) ? 0755 : 0644;
       log_write(bp);   // mark it allocated on the disk
       brelse(bp);
       return iget(dev, inum);
@@ -267,6 +267,9 @@ iupdate(struct inode *ip)
   dip->minor = ip->minor;
   dip->nlink = ip->nlink;
   dip->size = ip->size;
+  dip->uid = ip->uid;
+  dip->gid = ip->gid;
+  dip->mode = ip->mode;
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
   log_write(bp);
   brelse(bp);
@@ -341,6 +344,9 @@ ilock(struct inode *ip)
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
+    ip->uid = dip->uid;
+    ip->gid = dip->gid;
+    ip->mode = dip->mode;
     memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
     brelse(bp);
     ip->valid = 1;
@@ -526,6 +532,9 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  st->uid = ip->uid;
+  st->gid = ip->gid;
+  st->mode = ip->mode;
 }
 
 //PAGEBREAK!

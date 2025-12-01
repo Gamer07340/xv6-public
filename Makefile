@@ -153,12 +153,38 @@ tags: $(OBJS) entryother.S _init
 vectors.S: vectors.pl
 	./vectors.pl > vectors.S
 
-ULIB = ulib.o usys.o printf.o umalloc.o ansi.o
+ULIB = ulib.o usys.o printf.o umalloc.o ansi.o sha256.o
 
 _%: %.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
+
+# User programs that need passwd library
+_useradd: useradd.o ulib.o usys.o printf.o umalloc.o ansi.o passwd.o sha256.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > useradd.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > useradd.sym
+
+_userdel: userdel.o ulib.o usys.o printf.o umalloc.o ansi.o passwd.o sha256.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > userdel.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > userdel.sym
+
+_passwd_cmd: passwd_cmd.o ulib.o usys.o printf.o umalloc.o ansi.o passwd.o sha256.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > passwd_cmd.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > passwd_cmd.sym
+
+_login: login.o ulib.o usys.o printf.o umalloc.o ansi.o passwd.o sha256.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > login.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > login.sym
+
+_su: su.o ulib.o usys.o printf.o umalloc.o ansi.o passwd.o sha256.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > su.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > su.sym
 
 _forktest: forktest.o $(ULIB)
 	# forktest has less library code linked in - needs to be small
@@ -186,7 +212,7 @@ dns.o: dns.c
 _tcc: tcc/tcc.c tcc/libc_compat.c $(ULIB)
 	$(CC) $(CFLAGS) -Wno-error -DTCC_TARGET_I386 -DONE_SOURCE -DCONFIG_TCCDIR=\"/lib/tcc\" -DTCC_VERSION=\"0.9.27\" -Itcc/include -I. -Itcc -c tcc/tcc.c
 	$(CC) $(CFLAGS) -Wno-error -Itcc/include -I. -Itcc -c tcc/libc_compat.c
-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _tcc tcc.o libc_compat.o ulib.o usys.o umalloc.o ansi.o $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 --allow-multiple-definition -o _tcc tcc.o libc_compat.o ulib.o usys.o umalloc.o ansi.o /usr/lib/gcc/x86_64-linux-gnu/11/32/libgcc.a
 	$(OBJDUMP) -S _tcc > tcc.asm
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
@@ -221,6 +247,16 @@ UPROGS=\
 	_guiserver\
 	_ping\
 	_wget\
+	_chown\
+	_chmod\
+	_login\
+	_su\
+	_useradd\
+	_userdel\
+	_passwd_cmd\
+	_permtest\
+	_debug_su\
+	_pwd\
 
 fs.img: mkfs README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
 	./mkfs fs.img README $(UPROGS) test.sh hello.code tcc/include/*.h ulib.c printf.c umalloc.c ansi.c usys.S types.h stat.h fcntl.h user.h x86.h param.h mmu.h proc.h elf.h traps.h syscall.h spinlock.h sleeplock.h fs.h file.h date.h memlayout.h ansi.h
@@ -231,8 +267,7 @@ clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*.o *.d *.asm *.sym vectors.S bootblock entryother \
 	initcode initcode.out kernel xv6.img fs.img kernelmemfs \
-	xv6memfs.img mkfs .gdbinit \
-	$(UPROGS)
+	xv6memfs.img mkfs .gdbinit $(UPROGS)
 
 # make a printout
 FILES = $(shell grep -v '^\#' runoff.list)

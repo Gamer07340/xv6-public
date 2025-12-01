@@ -145,6 +145,24 @@ main(int argc, char *argv[])
   strcpy(de.name, "bin");
   iappend(rootino, &de, sizeof(de));
 
+  // Create /home
+  uint homeino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(homeino);
+  strcpy(de.name, ".");
+  iappend(homeino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(homeino, &de, sizeof(de));
+
+  // Add home to root
+  bzero(&de, sizeof(de));
+  de.inum = xshort(homeino);
+  strcpy(de.name, "home");
+  iappend(rootino, &de, sizeof(de));
+
   // Create /log
   uint logino = ialloc(T_DIR);
   bzero(&de, sizeof(de));
@@ -181,12 +199,42 @@ main(int argc, char *argv[])
   strcpy(de.name, "etc");
   iappend(rootino, &de, sizeof(de));
 
+  // Create /etc/passwd file with root user
+  uint passwdino = ialloc(T_FILE);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(passwdino);
+  strcpy(de.name, "passwd");
+  iappend(etcino, &de, sizeof(de));
+
+  // Write root user entry with SHA256 hashed password
+  // Password is "root", SHA256 hash: 4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2
+  char *passwd_content = "root:4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2:0:0:/root:/bin/sh\n";
+  iappend(passwdino, passwd_content, strlen(passwd_content));
+
   // Create /etc/services
   uint servicesino = ialloc(T_FILE);
   bzero(&de, sizeof(de));
   de.inum = xshort(servicesino);
   strcpy(de.name, "services");
   iappend(etcino, &de, sizeof(de));
+
+  // Create /root (home directory for root user)
+  uint roothomeino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(roothomeino);
+  strcpy(de.name, ".");
+  iappend(roothomeino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(roothomeino, &de, sizeof(de));
+
+  // Add root to root directory
+  bzero(&de, sizeof(de));
+  de.inum = xshort(roothomeino);
+  strcpy(de.name, "root");
+  iappend(rootino, &de, sizeof(de));
 
   // Create /var
   uint varino = ialloc(T_DIR);
@@ -326,6 +374,24 @@ main(int argc, char *argv[])
   strcpy(de.name, "include");
   iappend(usrino, &de, sizeof(de));
 
+  // Create /usr/lib
+  uint libino = ialloc(T_DIR);
+  bzero(&de, sizeof(de));
+  de.inum = xshort(libino);
+  strcpy(de.name, ".");
+  iappend(libino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(usrino);
+  strcpy(de.name, "..");
+  iappend(libino, &de, sizeof(de));
+
+  // Add lib to usr
+  bzero(&de, sizeof(de));
+  de.inum = xshort(libino);
+  strcpy(de.name, "lib");
+  iappend(usrino, &de, sizeof(de));
+
   for(i = 2; i < argc; i++){
     // assert(index(argv[i], '/') == 0);
 
@@ -344,6 +410,11 @@ main(int argc, char *argv[])
       target_ino = binino;
     } else if (strlen(argv[i]) > 2 && strcmp(argv[i] + strlen(argv[i]) - 2, ".h") == 0) {
       target_ino = incino;
+    } else if (strcmp(argv[i], "ulib.c") == 0 || strcmp(argv[i], "printf.c") == 0 ||
+               strcmp(argv[i], "umalloc.c") == 0 || strcmp(argv[i], "ansi.c") == 0 ||
+               strcmp(argv[i], "usys.S") == 0) {
+      // Place library source files in /usr/lib
+      target_ino = libino;
     }
 
     inum = ialloc(T_FILE);
@@ -355,6 +426,8 @@ main(int argc, char *argv[])
 
     while((cc = read(fd, buf, sizeof(buf))) > 0)
       iappend(inum, buf, cc);
+
+    
 
     close(fd);
   }
@@ -387,6 +460,13 @@ main(int argc, char *argv[])
   din.size = xint(off);
   winode(incino, &din);
 
+  // fix size of lib inode dir
+  rinode(libino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(libino, &din);
+
   // fix size of log inode dir
   rinode(logino, &din);
   off = xint(din.size);
@@ -400,6 +480,13 @@ main(int argc, char *argv[])
   off = ((off/BSIZE) + 1) * BSIZE;
   din.size = xint(off);
   winode(etcino, &din);
+
+  // fix size of root home inode dir
+  rinode(roothomeino, &din);
+  off = xint(din.size);
+  off = ((off/BSIZE) + 1) * BSIZE;
+  din.size = xint(off);
+  winode(roothomeino, &din);
 
   // fix size of var inode dir
   rinode(varino, &din);
@@ -490,6 +577,12 @@ ialloc(ushort type)
   din.type = xshort(type);
   din.nlink = xshort(1);
   din.size = xint(0);
+  din.uid = xint(0);
+  din.gid = xint(0);
+  if(type == T_DIR)
+    din.mode = xint(0040777);
+  else
+    din.mode = xint(0100777);
   winode(inum, &din);
   return inum;
 }

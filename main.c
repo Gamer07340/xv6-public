@@ -27,6 +27,7 @@ main(void)
   ioapicinit();    // another interrupt controller
   consoleinit();   // console hardware
   uartinit();      // serial port
+  cprintf("xv6 kernel starting (LBA mode)...\n");
   vga_init();      // vga
   mouse_init();    // mouse
   pinit();         // process table
